@@ -23,6 +23,8 @@ jobs:
         run: |
           ssh -i ~/.ssh/mohit.pem \
           ${{ secrets.EC2_USER }}@${{ secrets.KNOWN_HOST }} << 'EOF'
+           export PATH=$PATH:/usr/local/bin
+            source ~/.bashrc || true
             cd ~/devops-part
             git pull origin main
             pnpm install
