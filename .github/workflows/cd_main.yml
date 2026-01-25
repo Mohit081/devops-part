@@ -15,24 +15,24 @@ jobs:
       - name: Setup SSH key
         run: |
           mkdir -p ~/.ssh
-          echo "${{ secrets.SSH_PRIVATE_KEY }}" > ~/.ssh/for-test.pem
-          chmod 400 ~/.ssh/for-test.pem
+          echo "${{ secrets.SSH_PRIVATE_KEY }}" > ~/.ssh/mohit.pem
+          chmod 400 ~/.ssh/mohit.pem
           ssh-keyscan -H ${{ secrets.EC2_HOST }} > ~/.ssh/known_hosts
 
       - name: Deploy
         run: |
-          ssh -i ~/.ssh/for-test.pem \
+          ssh -i ~/.ssh/mohit.pem \
           ${{ secrets.EC2_USER }}@${{ secrets.KNOWN_HOST }} << 'EOF'
-            cd ~/Server-ec2
+            cd ~/devops-part
             git pull origin main
             pnpm install
             pnpm run build
             pm2 stop all || true
             pm2 delete all || true
 
-            pm2 start npm --name http-server --cwd ~/Server-ec2/apps/http-server
-            pm2 start npm --name ws-server   --cwd ~/Server-ec2/apps/ws-server
-            pm2 start npm --name web --cwd ~/Server-ec2/apps/web -- run start
+            pm2 start npm --name "http-server" -- start --cwd ~/devops-part/apps/http-server
+            pm2 start npm --name "ws-server" -- start   --cwd ~/devops-part/apps/ws-server
+            pm2 start npm --name "next-server" -- start --cwd ~/devops-part/apps/web 
 
             pm2 save
           EOF
