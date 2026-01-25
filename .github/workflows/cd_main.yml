@@ -27,6 +27,19 @@ jobs:
             
             cd ~/devops-part
             git pull origin main
+            if ! command -v npm >/dev/null 2>&1; then
+              if command -v apt-get >/dev/null 2>&1; then
+                if command -v sudo >/dev/null 2>&1; then SUDO=sudo; else SUDO=""; fi
+                $SUDO apt-get update -y
+                $SUDO apt-get install -y ca-certificates curl gnupg
+                curl -fsSL https://deb.nodesource.com/setup_20.x | $SUDO -E bash -
+                $SUDO apt-get install -y nodejs
+              elif command -v yum >/dev/null 2>&1; then
+                if command -v sudo >/dev/null 2>&1; then SUDO=sudo; else SUDO=""; fi
+                curl -fsSL https://rpm.nodesource.com/setup_20.x | $SUDO bash -
+                $SUDO yum install -y nodejs
+              fi
+            fi
             if command -v corepack >/dev/null 2>&1; then
               corepack enable
               corepack prepare pnpm@9.0.0 --activate
