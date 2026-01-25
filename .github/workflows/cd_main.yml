@@ -23,9 +23,17 @@ jobs:
         run: |
           ssh -i ~/.ssh/mohit.pem \
           ${{ secrets.EC2_USER }}@${{ secrets.KNOWN_HOST }} << 'EOF'
+            set -e
             
             cd ~/devops-part
             git pull origin main
+            if command -v corepack >/dev/null 2>&1; then
+              corepack enable
+              corepack prepare pnpm@9.0.0 --activate
+            else
+              npm i -g pnpm
+            fi
+            command -v pm2 >/dev/null 2>&1 || npm i -g pm2
             pnpm install
             pnpm run build
             pm2 stop all || true
