@@ -17,7 +17,7 @@ jobs:
           mkdir -p ~/.ssh
           echo "${{ secrets.SSH_PRIVATE_KEY }}" > ~/.ssh/mohit.pem
           chmod 400 ~/.ssh/mohit.pem
-          ssh-keyscan -H ${{ secrets.EC2_HOST }} > ~/.ssh/known_hosts
+          ssh-keyscan -H ${{ secrets.KNOWN_HOST }} > ~/.ssh/known_hosts
 
       - name: Deploy
         run: |
