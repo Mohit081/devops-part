@@ -23,8 +23,51 @@ jobs:
         run: |
           ssh -i ~/.ssh/mohit.pem \
           ${{ secrets.EC2_USER }}@${{ secrets.KNOWN_HOST }} << 'EOF'
+            set -e
+            export PATH="/usr/local/bin:/usr/bin:/bin:$PATH"
+          
             cd ~/devops-part
             git pull origin main
+            if ! command -v npm >/dev/null 2>&1; then
+              if command -v apt-get >/dev/null 2>&1; then
+                if command -v sudo >/dev/null 2>&1; then SUDO=sudo; else SUDO=""; fi
+                $SUDO apt-get update -y
+                $SUDO apt-get install -y ca-certificates curl gnupg
+                curl -fsSL https://deb.nodesource.com/setup_20.x | $SUDO -E bash -
+                $SUDO apt-get install -y nodejs
+              elif command -v dnf >/dev/null 2>&1; then
+                if command -v sudo >/dev/null 2>&1; then SUDO=sudo; else SUDO=""; fi
+                curl -fsSL https://rpm.nodesource.com/setup_20.x | $SUDO bash -
+                $SUDO dnf install -y nodejs
+              elif command -v yum >/dev/null 2>&1; then
+                if command -v sudo >/dev/null 2>&1; then SUDO=sudo; else SUDO=""; fi
+                curl -fsSL https://rpm.nodesource.com/setup_20.x | $SUDO bash -
+                $SUDO yum install -y nodejs
+              elif command -v apk >/dev/null 2>&1; then
+                if command -v sudo >/dev/null 2>&1; then SUDO=sudo; else SUDO=""; fi
+                $SUDO apk add --no-cache nodejs npm
+              else
+                export NVM_DIR="$HOME/.nvm"
+                if [ ! -d "$NVM_DIR" ]; then
+                  curl -fsSL https://raw.githubusercontent.com/nvm-sh/nvm/v0.39.7/install.sh | bash
+                fi
+                . "$NVM_DIR/nvm.sh"
+                nvm install 20
+                nvm use 20
+              fi
+            fi
+            if command -v npm >/dev/null 2>&1; then
+              export PATH="$(npm prefix -g)/bin:$PATH"
+            fi
+            if command -v corepack >/dev/null 2>&1; then
+              corepack enable
+              corepack prepare pnpm@9.0.0 --activate
+            else
+              npm i -g corepack
+              corepack enable
+              corepack prepare pnpm@9.0.0 --activate
+            fi
+            command -v pm2 >/dev/null 2>&1 || npm i -g pm2
             pnpm install
             pnpm run build
             pm2 stop all || true
