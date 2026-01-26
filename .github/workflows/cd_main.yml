@@ -50,9 +50,9 @@ jobs:
             pm2 stop all || true
             pm2 delete all || true
 
-            pm2 start npm --name "http-server" -- start  --cwd ~/devops-part/apps/http-server
-            pm2 start npm --name "ws-server" -- start   --cwd ~/devops-part/apps/ws-server
-            pm2 start npm --name "next-server" -- start --cwd ~/devops-part/apps/web
+            pm2 start "pnpm start" --name http-server --cwd apps/http-server
+            pm2 start "pnpm start" --name ws-server   --cwd apps/ws-server
+            pm2 start "pnpm start" --name next-server        --cwd apps/web
 
             pm2 save
           EOF
