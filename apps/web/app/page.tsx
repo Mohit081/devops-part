@@ -7,7 +7,7 @@ export default async function Home() {
 
     return (
       <div>
-        First name haha server: mohit 2
+        First  server: mohit 2
         {user?.username}
         password:
         {user?.password}
