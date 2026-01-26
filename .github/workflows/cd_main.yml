@@ -2,64 +2,52 @@ name: Deploy to EC2
 
 on:
   push:
-    branches: [main]
+    branches:
+      - main
 
 jobs:
   deploy:
     runs-on: ubuntu-latest
 
     steps:
-      - name: Checkout code
-        uses: actions/checkout@v4
+      - uses: actions/checkout@v4
 
-      - name: Setup SSH
+      - name: Setup SSH key
         run: |
           mkdir -p ~/.ssh
-
-          # Fix Windows line endings + correct key format
-          echo "${{ secrets.SSH_PRIVATE_KEY }}" | tr -d '\r' > ~/.ssh/ec2.pem
-          chmod 600 ~/.ssh/ec2.pem
-
-          # Prevent host verification error
-          ssh-keyscan -H ${{ secrets.EC2_HOST }} >> ~/.ssh/known_hosts
-
-      - name: Test SSH connection
+          echo "${{ secrets.SSH_PRIVATE_KEY }}" > ~/.ssh/mohit.pem
+          chmod 400 ~/.ssh/mohit.pem
+          ssh-keyscan -H ${{ secrets.KNOWN_HOST }} > ~/.ssh/known_hosts
+      - name: Deploy
         run: |
-          ssh -o StrictHostKeyChecking=no -i ~/.ssh/ec2.pem \
-          ${{ secrets.EC2_USER }}@${{ secrets.EC2_HOST }} "echo SSH CONNECTION OK"
-
-      - name: Deploy to EC2
-        run: |
-          ssh -i ~/.ssh/ec2.pem ${{ secrets.EC2_USER }}@${{ secrets.EC2_HOST }} << 'EOF'
-            set -e
-
-            echo "Loading Node via NVM"
+          ssh -i ~/.ssh/mohit.pem \
+          ${{ secrets.EC2_USER }}@${{ secrets.KNOWN_HOST }} << 'EOF'
+          set -e
+            echo "📦 Loading Node environment"
             export NVM_DIR="$HOME/.nvm"
             [ -s "$NVM_DIR/nvm.sh" ] && . "$NVM_DIR/nvm.sh"
-
-            echo "Enable pnpm"
+            node -v
+            npm -v
+            echo "📦 Enable pnpm via corepack"
             corepack enable
             corepack prepare pnpm@latest --activate
-
-            echo "Ensure PM2"
-            command -v pm2 >/dev/null || npm install -g pm2
-
+            pnpm -v
+            echo "📦 Ensure pm2 exists"
+            if ! command -v pm2 >/dev/null 2>&1; then
+              npm install -g pm2
+            fi
+            pm2 -v
+            echo "🚀 Deploying app"
+            
             cd ~/devops-part
-
-            echo "Pull latest code"
             git pull origin main
-
-            echo "Install deps & build"
+            
             pnpm install
             pnpm run build
-
-            echo "Restart services"
             pm2 stop all || true
             pm2 delete all || true
-
-            pm2 start npm --name http-server -- start --cwd apps/http-server
-            pm2 start npm --name ws-server   -- start --cwd apps/ws-server
-            pm2 start npm --name next-server -- start --cwd apps/web
-
+            pm2 start npm --name "http-server" -- start --cwd ~/devops-part/apps/http-server
+            pm2 start npm --name "ws-server" -- start   --cwd ~/devops-part/apps/ws-server
+            pm2 start npm --name "next-server" -- start --cwd ~/devops-part/apps/web 
             pm2 save
           EOF
