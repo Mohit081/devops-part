@@ -9,36 +9,51 @@ jobs:
     runs-on: ubuntu-latest
 
     steps:
-      - uses: actions/checkout@v4
+      - name: Checkout code
+        uses: actions/checkout@v4
 
       - name: Setup SSH
         run: |
           mkdir -p ~/.ssh
-          echo "${{ secrets.SSH_PRIVATE_KEY }}" > ~/.ssh/ec2.pem
-          chmod 400 ~/.ssh/ec2.pem
+
+          # Fix Windows line endings + correct key format
+          echo "${{ secrets.SSH_PRIVATE_KEY }}" | tr -d '\r' > ~/.ssh/ec2.pem
+          chmod 600 ~/.ssh/ec2.pem
+
+          # Prevent host verification error
           ssh-keyscan -H ${{ secrets.EC2_HOST }} >> ~/.ssh/known_hosts
+
+      - name: Test SSH connection
+        run: |
+          ssh -o StrictHostKeyChecking=no -i ~/.ssh/ec2.pem \
+          ${{ secrets.EC2_USER }}@${{ secrets.EC2_HOST }} "echo SSH CONNECTION OK"
 
       - name: Deploy to EC2
         run: |
           ssh -i ~/.ssh/ec2.pem ${{ secrets.EC2_USER }}@${{ secrets.EC2_HOST }} << 'EOF'
             set -e
 
-            # Load Node (NVM)
+            echo "Loading Node via NVM"
             export NVM_DIR="$HOME/.nvm"
-            source "$NVM_DIR/nvm.sh"
+            [ -s "$NVM_DIR/nvm.sh" ] && . "$NVM_DIR/nvm.sh"
 
+            echo "Enable pnpm"
             corepack enable
             corepack prepare pnpm@latest --activate
 
-            # Ensure PM2
-            command -v pm2 >/dev/null || npm i -g pm2
+            echo "Ensure PM2"
+            command -v pm2 >/dev/null || npm install -g pm2
 
             cd ~/devops-part
+
+            echo "Pull latest code"
             git pull origin main
 
+            echo "Install deps & build"
             pnpm install
             pnpm run build
 
+            echo "Restart services"
             pm2 stop all || true
             pm2 delete all || true
 
