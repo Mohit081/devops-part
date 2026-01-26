@@ -1,9 +1,8 @@
-name: Deploy to EC2 
+name: Deploy to EC2
 
 on:
   push:
-    branches:
-      - main
+    branches: [main]
 
 jobs:
   deploy:
@@ -15,67 +14,45 @@ jobs:
       - name: Setup SSH key
         run: |
           mkdir -p ~/.ssh
-          echo "${{ secrets.SSH_PRIVATE_KEY }}" > ~/.ssh/mohit.pem
-          chmod 400 ~/.ssh/mohit.pem
-          ssh-keyscan -H ${{ secrets.KNOWN_HOST }} > ~/.ssh/known_hosts
+          echo "${{ secrets.SSH_PRIVATE_KEY }}" | tr -d '\r' > ~/.ssh/mohit.pem
+          chmod 600 ~/.ssh/mohit.pem
+          ssh-keyscan -H ${{ secrets.KNOWN_HOST }} >> ~/.ssh/known_hosts
 
       - name: Deploy
         run: |
-          ssh -i ~/.ssh/mohit.pem \
-          ${{ secrets.EC2_USER }}@${{ secrets.KNOWN_HOST }} << 'EOF'
+          ssh -i ~/.ssh/mohit.pem ${{ secrets.EC2_USER }}@${{ secrets.KNOWN_HOST }} << 'EOF'
             set -e
-            export PATH="/usr/local/bin:/usr/bin:/bin:$PATH"
-          
+
+            # 🔹 Load Node (NVM)
+            export NVM_DIR="$HOME/.nvm"
+            [ -s "$NVM_DIR/nvm.sh" ] && . "$NVM_DIR/nvm.sh"
+
+            # 🔹 Ensure node & npm
+            node -v
+            npm -v
+
+            # 🔹 Install pnpm if missing
+            if ! command -v pnpm >/dev/null 2>&1; then
+              npm install -g pnpm
+            fi
+
+            # 🔹 Install pm2 if missing
+            if ! command -v pm2 >/dev/null 2>&1; then
+              npm install -g pm2
+            fi
+
             cd ~/devops-part
             git pull origin main
-            if ! command -v npm >/dev/null 2>&1; then
-              if command -v apt-get >/dev/null 2>&1; then
-                if command -v sudo >/dev/null 2>&1; then SUDO=sudo; else SUDO=""; fi
-                $SUDO apt-get update -y
-                $SUDO apt-get install -y ca-certificates curl gnupg
-                curl -fsSL https://deb.nodesource.com/setup_20.x | $SUDO -E bash -
-                $SUDO apt-get install -y nodejs
-              elif command -v dnf >/dev/null 2>&1; then
-                if command -v sudo >/dev/null 2>&1; then SUDO=sudo; else SUDO=""; fi
-                curl -fsSL https://rpm.nodesource.com/setup_20.x | $SUDO bash -
-                $SUDO dnf install -y nodejs
-              elif command -v yum >/dev/null 2>&1; then
-                if command -v sudo >/dev/null 2>&1; then SUDO=sudo; else SUDO=""; fi
-                curl -fsSL https://rpm.nodesource.com/setup_20.x | $SUDO bash -
-                $SUDO yum install -y nodejs
-              elif command -v apk >/dev/null 2>&1; then
-                if command -v sudo >/dev/null 2>&1; then SUDO=sudo; else SUDO=""; fi
-                $SUDO apk add --no-cache nodejs npm
-              else
-                export NVM_DIR="$HOME/.nvm"
-                if [ ! -d "$NVM_DIR" ]; then
-                  curl -fsSL https://raw.githubusercontent.com/nvm-sh/nvm/v0.39.7/install.sh | bash
-                fi
-                . "$NVM_DIR/nvm.sh"
-                nvm install 20
-                nvm use 20
-              fi
-            fi
-            if command -v npm >/dev/null 2>&1; then
-              export PATH="$(npm prefix -g)/bin:$PATH"
-            fi
-            if command -v corepack >/dev/null 2>&1; then
-              corepack enable
-              corepack prepare pnpm@9.0.0 --activate
-            else
-              npm i -g corepack
-              corepack enable
-              corepack prepare pnpm@9.0.0 --activate
-            fi
-            command -v pm2 >/dev/null 2>&1 || npm i -g pm2
+
             pnpm install
             pnpm run build
+
             pm2 stop all || true
             pm2 delete all || true
 
             pm2 start dist/index.js --name http-server --cwd ~/Server-ec2/apps/http-server
             pm2 start dist/index.js --name ws-server   --cwd ~/Server-ec2/apps/ws-server
-            pm2 start npm --name web --cwd ~/Server-ec2/apps/web -- run start
+            pm2 start npm --name web -- run start --cwd ~/Server-ec2/apps/web
 
             pm2 save
           EOF
